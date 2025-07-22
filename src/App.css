@@ -1,0 +1,142 @@
+/* loyaltycard.css */
+
+/* 1. Dark Mode Variables */
+:root {
+  --bg-color: #121212;
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --text-color: #e0e0e0;
+  --accent-color: #ff6f61;
+  --input-bg: rgba(255, 255, 255, 0.10);
+  --shadow-color: rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Optional: override for light mode */
+    --bg-color: #f5f5f5;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --text-color: #333333;
+    --accent-color: #0077cc;
+    --input-bg: rgba(0, 0, 0, 0.05);
+    --shadow-color: rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* 2. Global Reset & Base Styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+}
+
+body {
+  background: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+}
+
+/* 3. Container & Typography */
+.container {
+  width: 100%;
+  max-width: 480px;
+  backdrop-filter: blur(12px);
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px var(--shadow-color);
+  padding: 2rem;
+}
+
+h1, h2 {
+  margin-bottom: 1rem;
+  letter-spacing: 0.5px;
+}
+
+h1 {
+  font-size: 2rem;
+  text-align: center;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+/* 4. Forms & Inputs */
+.form-section {
+  margin-top: 1.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  background: var(--input-bg);
+  color: var(--text-color);
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-color);
+  transform: translateY(-2px);
+}
+
+/* 5. Buttons */
+button {
+  display: block;
+  width: 100%;
+  background: var(--accent-color);
+  color: #fff;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button:not(:disabled):hover {
+  background: lighten(var(--accent-color), 10%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--shadow-color);
+}
+
+/* 6. Accessibility & Performance */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+  }
+}
