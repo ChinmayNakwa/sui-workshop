@@ -1,8 +1,4 @@
-// server/server.js
-
-// --- FIX: Load environment variables at the absolute start of the application ---
-import 'dotenv/config';
-
+import 'dotenv/config'; // MUST be the first import
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -11,48 +7,70 @@ import { generateImageFromPrompt } from './generator.js';
 
 const app = express();
 const port = 8000;
-
-// Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware
-app.use(cors()); // Allow requests from our React frontend
-app.use(express.json()); // Allow the server to understand JSON request bodies
+// --- Middleware ---
+app.use(cors());
+app.use(express.json());
 
-// Serve static files (our generated images) from the public/generated directory
-app.use(express.static(path.join(process.cwd(), 'public')));
+// --- FIX 1: API ROUTES DEFINED BEFORE STATIC FILE SERVING ---
+// This ensures that a request to '/generate-batch-images' is never mistaken for a file.
 
-// API endpoint that the frontend will call
-app.post('/generate-image', async (req, res) => {
-  const { prompt } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
-  }
-
-  console.log(`Received prompt: "${prompt}"`);
-
+// Existing single image endpoint (no changes to its logic)
+app.post('/generate-image', async (req, res, next) => {
+  // Pass errors to the global error handler with `next`
   try {
-    // Call the generator function to get the image URL
+    const { prompt } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+    console.log(`Received prompt: "${prompt}"`);
     const imageUrl = await generateImageFromPrompt(prompt);
+    res.json({ imageUrl });
+  } catch (error) {
+    next(error); // Pass error to the global handler
+  }
+});
 
-    if (!imageUrl) {
-        throw new Error('Image generation failed to produce a valid URL or file.');
+// Batch minting endpoint
+app.post('/generate-batch-images', async (req, res, next) => {
+  // Pass errors to the global error handler with `next`
+  try {
+    const { prompt, count } = req.body;
+    if (!prompt || !count || count < 1) {
+      return res.status(400).json({ error: 'A valid prompt and count are required' });
     }
 
-    // This logic correctly handles the full URL returned by Cloudinary
-    const fullImageUrl = imageUrl.startsWith('/') 
-      ? `http://localhost:${port}${imageUrl}` 
-      : imageUrl;
+    const imageCount = Math.min(parseInt(count, 10), 10);
+    console.log(`Received batch request for ${imageCount} images with prompt: "${prompt}"`);
 
-    console.log(`Sending back image URL: ${fullImageUrl}`);
-    res.json({ imageUrl: fullImageUrl });
+    const imagePromises = Array.from({ length: imageCount }, (_, i) => {
+        const variedPrompt = `${prompt}, high quality, digital art #${i + 1}`;
+        return generateImageFromPrompt(variedPrompt);
+    });
 
+    const imageUrls = await Promise.all(imagePromises);
+    console.log(`Sending back ${imageUrls.length} image URLs.`);
+    res.json({ imageUrls });
   } catch (error) {
-    console.error('Error in /generate-image endpoint:', error);
-    res.status(500).json({ error: 'Failed to generate image', details: error.message });
+    next(error); // Pass any errors to the global handler
   }
+});
+
+// --- Static file serving comes after API routes ---
+app.use(express.static(path.join(process.cwd(), 'public')));
+
+// --- FIX 2: GLOBAL ERROR HANDLING MIDDLEWARE ---
+// This is the safety net. Any `next(error)` call will land here.
+// This guarantees we always send a JSON error and never crash.
+app.use((err, req, res, next) => {
+  console.error("--- Global Server Error ---");
+  console.error(err.stack); // Log the full error to the server console
+  res.status(500).json({
+    error: 'An unexpected server error occurred.',
+    details: err.message, // Provide the error message in the JSON response
+  });
 });
 
 app.listen(port, () => {

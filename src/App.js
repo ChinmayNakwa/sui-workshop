@@ -9,56 +9,54 @@ import './App.css';
 
 const LoyaltyCardPage = () => {
   const currentAccount = useCurrentAccount();
-  const [isMinting, setIsMinting] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [status, setStatus] = useState('idle'); // 'generating', 'minting', 'idle'
   const [packageId, setPackageId] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
+  const [quantity, setQuantity] = useState(1);
 
-  // Form states
   const [mintForm, setMintForm] = useState({
     customerId: '',
-    imageUrl: ''
+    imageUrls: []
   });
 
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
-  // Agentic Action 1: Generate Image via Backend
-  const handleGenerateImage = async () => {
+  const handleGenerateImages = async () => {
     if (!imagePrompt) {
-      alert('Please describe the image you want to generate.');
+      alert('Please describe the image(s) you want to generate.');
       return;
     }
-    setIsGeneratingImage(true);
-    setMintForm({ ...mintForm, imageUrl: '' }); // Clear previous image
+    setStatus('generating');
+    setMintForm(prev => ({ ...prev, imageUrls: [] }));
     try {
-      const response = await fetch('http://localhost:8000/generate-image', {
+      const response = await fetch('http://localhost:8000/generate-batch-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: imagePrompt }),
+        body: JSON.stringify({ prompt: imagePrompt, count: quantity }),
       });
 
+      const data = await response.json();
+
+      // Check for a server-side error message in the JSON response
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get image from AI agent.');
+        throw new Error(data.details || data.error || 'Failed to get images from AI agent.');
       }
 
-      const data = await response.json();
-      setMintForm({ ...mintForm, imageUrl: data.imageUrl });
+      setMintForm(prev => ({ ...prev, imageUrls: data.imageUrls }));
 
     } catch (error) {
-      console.error('Image generation error:', error);
-      alert(error.message);
+      console.error('Image generation fetch error:', error);
+      alert(`Error generating images: ${error.message}`);
     } finally {
-      setIsGeneratingImage(false);
+      setStatus('idle');
     }
   };
 
-  const handleMintChange = (e) => {
+  const handleFormChange = (e) => {
     setMintForm({ ...mintForm, [e.target.name]: e.target.value });
   };
 
-  // Agentic Action 2: Mint the NFT with the generated data
-  const mintLoyalty = async () => {
+  const mintLoyaltyBatch = async () => {
     if (!currentAccount) {
       alert('Please connect your wallet first.');
       return;
@@ -67,33 +65,40 @@ const LoyaltyCardPage = () => {
       alert('Please enter a valid Package ID.');
       return;
     }
+    if (mintForm.imageUrls.length === 0) {
+      alert('Please generate images before minting.');
+      return;
+    }
 
-    setIsMinting(true);
+    setStatus('minting');
     try {
       const tx = new Transaction();
-      tx.moveCall({
-        target: `${packageId}::loyalty_card::mint_loyalty`,
-        arguments: [
-          tx.pure.address(mintForm.customerId),
-          tx.pure.string(mintForm.imageUrl)
-        ]
-      });
+      for (const imageUrl of mintForm.imageUrls) {
+        tx.moveCall({
+          target: `${packageId}::loyalty_card::mint_loyalty`,
+          arguments: [
+            tx.pure.address(mintForm.customerId),
+            tx.pure.string(imageUrl)
+          ]
+        });
+      }
       
       const result = await signAndExecute({ transaction: tx });
       
-      alert(`NFT minted successfully! Digest: ${result.digest}`);
-      // Reset form for the next creation
-      setMintForm({ ...mintForm, imageUrl: '' });
+      alert(`Batch mint successful! ${mintForm.imageUrls.length} NFTs minted. Digest: ${result.digest}`);
+      
+      setMintForm(prev => ({ ...prev, imageUrls: [] }));
       setImagePrompt('');
+      setQuantity(1);
+
     } catch (error) {
-      console.error('Error minting loyalty card:', error);
+      console.error('Error minting loyalty cards:', error);
       alert(`Minting failed: ${error.message}`);
     } finally {
-      setIsMinting(false);
+      setStatus('idle');
     }
   };
   
-  // Auto-fill recipient address when wallet is connected
   useEffect(() => {
     if (currentAccount) {
       setMintForm(prev => ({ ...prev, customerId: currentAccount.address }));
@@ -102,7 +107,8 @@ const LoyaltyCardPage = () => {
     }
   }, [currentAccount]);
 
-  const isLoading = isMinting || isGeneratingImage;
+  const isLoading = status === 'generating' || status === 'minting';
+  const generatedImageCount = mintForm.imageUrls.length;
 
   return (
     <div className="container">
@@ -120,38 +126,48 @@ const LoyaltyCardPage = () => {
         />
       </div>
 
-      {/*-- Step 1: Image Generation --*/}
       <section className="form-section">
-        <h2>1. Describe Your NFT Image</h2>
+        <h2>1. Describe Your NFT Image(s)</h2>
         <label>AI Prompt</label>
         <input
           type="text"
           value={imagePrompt}
           onChange={(e) => setImagePrompt(e.target.value)}
-          placeholder="pokemon of fire"
+          placeholder="A majestic lion king"
           disabled={isLoading}
         />
-        <button onClick={handleGenerateImage} disabled={isLoading || !imagePrompt.trim()}>
-          {isGeneratingImage ? 'Generating...' : 'Generate Image with AI'}
+        <label>Quantity (1-10)</label>
+        <input
+          type="number"
+          value={quantity}
+          onChange={(e) => setQuantity(Math.max(1, Math.min(10, Number(e.target.value))))}
+          min="1"
+          max="10"
+          disabled={isLoading}
+          style={{marginBottom: '1rem'}}
+        />
+        <button onClick={handleGenerateImages} disabled={isLoading || !imagePrompt.trim()}>
+          {status === 'generating' ? `Generating ${quantity} Image(s)...` : `Generate ${quantity} Image(s) with AI`}
         </button>
       </section>
 
-      {/*-- Step 2: Minting --*/}
       <section className="form-section">
-        <h2>2. Mint Your NFT</h2>
+        <h2>2. Mint Your NFT(s)</h2>
         
-        {/* Image Preview Area */}
-        <div style={{ textAlign: 'center', marginBottom: '1rem', minHeight: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isGeneratingImage ? (
-            <p>Generating NFT Image...</p>
-          ) : mintForm.imageUrl ? (
-            <img 
-              src={mintForm.imageUrl} 
-              alt="Generated NFT" 
-              style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', border: '1px solid var(--input-bg)' }} 
-            />
+        <div style={{ textAlign: 'center', marginBottom: '1rem', minHeight: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          {status === 'generating' ? (
+            <p>Generating NFT Images...</p>
+          ) : generatedImageCount > 0 ? (
+            mintForm.imageUrls.map((url, index) => (
+              <img 
+                key={index}
+                src={url} 
+                alt={`Generated NFT ${index + 1}`}
+                style={{ width: '120px', height: '120px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--input-bg)' }} 
+              />
+            ))
           ) : (
-            <p style={{color: 'rgba(255,255,255,0.5)'}}>Image preview will appear here</p>
+            <p style={{color: 'rgba(255,255,255,0.5)'}}>Image previews will appear here</p>
           )}
         </div>
         
@@ -160,32 +176,21 @@ const LoyaltyCardPage = () => {
           type="text"
           name="customerId"
           value={mintForm.customerId}
-          onChange={handleMintChange}
+          onChange={handleFormChange}
           placeholder="Connect wallet or enter address"
           disabled={isLoading}
         />
-        <label>Image URL (auto-filled by AI)</label>
-        <input
-          type="text"
-          name="imageUrl"
-          value={mintForm.imageUrl}
-          onChange={handleMintChange}
-          placeholder="https://source.unsplash.com/..."
-          disabled={isLoading}
-          readOnly 
-        />
         <button 
-          onClick={mintLoyalty} 
+          onClick={mintLoyaltyBatch} 
           disabled={
             isLoading || 
             !mintForm.customerId.trim() || 
-            !mintForm.imageUrl.trim() ||
+            generatedImageCount === 0 ||
             !packageId.trim()
           }
-          // Style override to match the darker red button in the image
           style={{'--accent-color': '#b33e38'}}
         >
-          {isMinting ? 'Minting...' : 'Mint Your NFT'}
+          {status === 'minting' ? 'Minting...' : `Mint ${generatedImageCount} NFT(s)`}
         </button>
       </section>
     </div>
