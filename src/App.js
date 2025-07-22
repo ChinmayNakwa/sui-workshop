@@ -21,6 +21,8 @@ const LoyaltyCardPage = () => {
 
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
   const handleGenerateImages = async () => {
     if (!imagePrompt) {
       alert('Please describe the image(s) you want to generate.');
@@ -29,7 +31,7 @@ const LoyaltyCardPage = () => {
     setStatus('generating');
     setMintForm(prev => ({ ...prev, imageUrls: [] }));
     try {
-      const response = await fetch('http://localhost:8000/generate-batch-images', {
+      const response = await fetch(`${API_URL}/generate-batch-images`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: imagePrompt, count: quantity }),
