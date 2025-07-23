@@ -20,8 +20,8 @@ Follow these instructions to get a local copy up and running for development and
 
 1.  **Clone the Repository**
     ```sh
-    git clone https://github.com/your-username/your-repo-name.git
-    cd your-repo-name
+    git clone https://github.com/ChinmayNakwa/sui-workshop
+    cd sui-workshop
     ```
 
 2.  **Install Dependencies**
@@ -48,23 +48,14 @@ Follow these instructions to get a local copy up and running for development and
     CLOUDINARY_API_SECRET="YOUR_CLOUDINARY_API_SECRET"
     ```
 
-4.  **Deploy the Sui Smart Contract**
-    Navigate to your Sui smart contract directory and publish it using the Sui CLI.
-    ```sh
-    # Example path, adjust if yours is different
-    cd sui_contract/
-    sui client publish --gas-budget 50000000
-    ```
-    After deployment, the CLI will output the **Package ID**. Copy this ID. You will need to paste it into the UI of the running application.
-
-5.  **Run the Backend Server**
+4.  **Run the Backend Server**
     From the project root directory, run:
     ```sh
     node server/server.js
     ```
     You should see the confirmation message: `✅ AI Agent server listening at http://localhost:8000`
 
-6.  **Run the Frontend Application**
+5.  **Run the Frontend Application**
     In a new terminal, also from the project root directory, run:
     ```sh
     npm start
